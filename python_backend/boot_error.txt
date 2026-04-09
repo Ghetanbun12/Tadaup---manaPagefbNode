@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "<string>", line 6, in <module>
+    app = create_app()
+  File "C:\Persional\f2farena\OAuth2FB\python_backend\app\__init__.py", line 37, in create_app
+    from app.routes.auth_routes import auth_bp
+  File "C:\Persional\f2farena\OAuth2FB\python_backend\app\routes\auth_routes.py", line 2, in <module>
+    from .. import fb_service
+ImportError: cannot import name 'fb_service' from 'app' (C:\Persional\f2farena\OAuth2FB\python_backend\app\__init__.py)
+cannot import name 'fb_service' from 'app' (C:\Persional\f2farena\OAuth2FB\python_backend\app\__init__.py)
