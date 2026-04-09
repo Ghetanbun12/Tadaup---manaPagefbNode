@@ -66,6 +66,24 @@ def reply_comment():
     res = fb_service.reply_to_comment(comment_id, active_page.access_token, message)
     return jsonify(res["data"] if res["success"] else res), (200 if res["success"] else 500)
 
+@page_bp.post('/page/comment/private-reply')
+@jwt_required()
+def private_reply_comment():
+    user_id = get_jwt_identity()
+    active_page = get_active_page(user_id)
+    if not active_page:
+        return jsonify({"error": "No active page selected"}), 401
+
+    data = request.json
+    comment_id = data.get("commentId")
+    message = data.get("message")
+    
+    if not comment_id or not message:
+        return jsonify({"error": "commentId and message are required"}), 400
+        
+    res = fb_service.send_private_reply_to_comment(comment_id, active_page.access_token, message)
+    return jsonify(res["data"] if res["success"] else res), (200 if res["success"] else 500)
+
 @page_bp.post('/page/comment/like')
 @jwt_required()
 def like_comment():

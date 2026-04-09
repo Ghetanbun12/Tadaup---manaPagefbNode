@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useLocation } from 'react-router-dom';
 import * as api from '../api/fbApi';
 import Skeleton, { SkeletonMessage } from '../components/Common/Skeleton';
 import AiReplyModal from '../components/AI/AiReplyModal';
 
 const MessengerPage = ({ onSendMessage, activePageId }) => {
+    const location = useLocation();
     const [conversations, setConversations] = useState([]);
     const [selectedConv, setSelectedConv] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -13,6 +15,54 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
     const [selectedMessageForAi, setSelectedMessageForAi] = useState(null);
     const [customerTags, setCustomerTags] = useState([]);
     const [newTag, setNewTag] = useState('');
+
+    const targetUserProcessed = useRef(false);
+    const chatInputRef = useRef(null);
+
+    // Xử lý auto-focus mỗi khi đổi cuộc trò chuyện
+    useEffect(() => {
+        if (selectedConv && chatInputRef.current) {
+            chatInputRef.current.focus();
+        }
+    }, [selectedConv]);
+
+    // [HỆ THỐNG PHÂN TIẾP] - Tự động chọn đúng ô chat khi được điều hướng từ Bảng tin
+    useEffect(() => {
+        if (!location.state?.targetUser || conversations.length === 0 || targetUserProcessed.current) return;
+
+        const targetId = String(location.state.targetUser.id);
+        const sourceCommentId = location.state.sourceCommentId;
+
+        console.log(`[FB-CRM-DEBUG] Đang tìm kiếm ô chat cho User ID: ${targetId}`);
+
+        // Tìm trong Participants của tất cả hội thoại hiện có (Chỉ tìm nếu không phải ID anon)
+        let targetConv = null;
+        if (!targetId.startsWith('anon_')) {
+            targetConv = conversations.find(c =>
+                c.participants?.data?.some(p => String(p.id) === targetId)
+            );
+        }
+
+        if (targetConv) {
+            console.log(`[FB-CRM-DEBUG] Đã tìm thấy hội thoại thực tế (ID: ${targetConv.id})`);
+            setSelectedConv(targetConv);
+            targetUserProcessed.current = true;
+        } else if (sourceCommentId) {
+            console.log(`[FB-CRM-DEBUG] Khởi tạo phiên chat ảo từ Comment ID: ${sourceCommentId}`);
+            const virtualConv = {
+                id: 'virtual_' + targetId,
+                isVirtual: true,
+                sourceCommentId: sourceCommentId,
+                updated_time: new Date().toISOString(),
+                unread_count: 0,
+                snippet: 'Đang khởi tạo tin nhắn mới cho khách ẩn danh...',
+                participants: { data: [location.state.targetUser] }
+            };
+            setConversations(prev => [virtualConv, ...prev.filter(c => c.id !== virtualConv.id)]);
+            setSelectedConv(virtualConv);
+            targetUserProcessed.current = true;
+        }
+    }, [conversations, location.state]);
 
     // 1. INITIAL LOAD: Load conversation list when page changes
     useEffect(() => {
@@ -78,9 +128,9 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
         if (showLoading) setLoadingList(true);
         try {
             const res = await api.getConversations();
-            // api.getConversations already returns axios.data (the FB JSON body)
-            // So res.data is the actual array from Facebook
-            setConversations(res.data || []);
+            const data = res.data || [];
+            console.log(`[FB-CRM-DEBUG] Đã tải ${data.length} hội thoại từ Facebook.`);
+            setConversations(data);
         } catch (err) {
             console.error('Lỗi tải hội thoại:', err);
         } finally {
@@ -89,6 +139,11 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
     };
 
     const loadMessages = async (convId) => {
+        if (!convId || convId.startsWith('virtual_')) {
+            setMessages([]);
+            return;
+        }
+
         setLoadingChat(true);
         try {
             const res = await api.getConversationMessages(convId);
@@ -105,20 +160,28 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
     const handleSendReply = async () => {
         if (!replyText.trim() || !selectedConv) return;
 
-        const recipientId = selectedConv.participants.data[0].id;
         try {
-            await onSendMessage(recipientId, replyText);
-            setReplyText('');
+            if (selectedConv.isVirtual) {
+                await api.sendPrivateReply(selectedConv.sourceCommentId, replyText);
+                setReplyText('');
+                // Drop router state to prevent infinite recreation on refresh
+                window.history.replaceState({}, '');
+                // Reload real conversation list from FB
+                loadConversations(true);
+            } else {
+                const recipientId = selectedConv.participants.data[0].id;
+                await onSendMessage(recipientId, replyText);
+                setReplyText('');
 
-            // 1. Clear unread count in local state
-            setConversations(prev => prev.map(c =>
-                c.id === selectedConv.id ? { ...c, unread_count: 0 } : c
-            ));
+                setConversations(prev => prev.map(c =>
+                    c.id === selectedConv.id ? { ...c, unread_count: 0 } : c
+                ));
 
-            // 2. Reload messages to show the new one
-            loadMessages(selectedConv.id);
+                loadMessages(selectedConv.id);
+            }
         } catch (err) {
             console.error('Gửi tin thất bại:', err);
+            alert('Lỗi: Bạn chỉ có thể nhắn tin trực tiếp (Inbox) nếu Comment này chưa từng được Reply Inbox trước đó, hoặc bị quá 7 ngày theo Policy Facebook.');
         }
     };
 
@@ -126,7 +189,7 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
         <div className="page-content" style={{ height: '100%' }}>
             <h2 style={{ marginBottom: '20px' }}>Hộp thư Inbox</h2>
 
-            <div className="inbox-layout">
+            <div className="inbox-layout" style={{ height: 'calc(100vh - 200px)' }}>
                 {/* Left: Conversation List */}
                 <div className="conv-list">
                     <div style={{ padding: '15px', borderBottom: '1px solid var(--border-light)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -181,7 +244,7 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
                 </div>
 
                 {/* Right: Chat Panel */}
-                <div className="chat-panel">
+                <div className="chat-panel" style={{ height: '100%' }}>
                     {selectedConv ? (
                         <>
                             <div style={{ padding: '15px', borderBottom: '1px solid var(--border-light)', background: '#fff', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -258,6 +321,7 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
                                 <div style={{ display: 'flex', gap: '10px' }}>
                                     <input
                                         type="text"
+                                        ref={chatInputRef}
                                         className="input-field"
                                         placeholder="Nhập tin nhắn phản hồi..."
                                         value={replyText}

@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import * as api from '../api/fbApi';
 import Skeleton from '../components/Common/Skeleton';
 import AiReplyModal from '../components/AI/AiReplyModal';
@@ -9,6 +10,13 @@ const AiCommentPage = () => {
     const [selectedComment, setSelectedComment] = useState(null);
     const [selectedPostContext, setSelectedPostContext] = useState('');
     const [error, setError] = useState('');
+    const navigate = useNavigate();
+
+    const handlePrivateReply = (comment) => {
+        const fallbackUser = { id: `anon_${comment.id}`, name: 'Người dùng Facebook (Ẩn danh)' };
+        const targetUser = comment.from || fallbackUser;
+        navigate('/messenger', { state: { targetUser, sourceCommentId: comment.id } });
+    };
 
     useEffect(() => {
         loadData();
@@ -88,7 +96,11 @@ const AiCommentPage = () => {
                                         borderRadius: '8px', background: 'rgba(255,255,255,0.02)',
                                         borderLeft: `4px solid ${getPriorityColor(c.ai?.priority)}`
                                     }}>
-                                        <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#ccc', overflow: 'hidden' }}>
+                                        <div
+                                            style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#ccc', overflow: 'hidden', cursor: 'pointer' }}
+                                            onClick={() => handlePrivateReply(c)}
+                                            title="Nhấn để nhắn tin"
+                                        >
                                             <img src={`https://graph.facebook.com/${c.from?.id}/picture?type=square`} alt="avatar" style={{ width: '100%', height: '100%' }} onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(c.from?.name || 'U')}&background=random`; }} />
                                         </div>
                                         <div style={{ flex: 1 }}>
@@ -113,6 +125,12 @@ const AiCommentPage = () => {
                                                 >
                                                     🤖 AI Phản hồi
                                                 </button>
+                                                <button
+                                                    onClick={() => handlePrivateReply(c)}
+                                                    style={{ background: 'transparent', color: 'var(--primary)', border: '1px solid var(--primary)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}
+                                                >
+                                                    Nhắn tin
+                                                </button>
                                                 <button style={{ background: 'transparent', color: 'var(--text-main)', border: '1px solid var(--border-light)', padding: '6px 12px', borderRadius: '6px', fontSize: '12px', cursor: 'pointer' }}>
                                                     Thích
                                                 </button>
@@ -123,13 +141,25 @@ const AiCommentPage = () => {
                                                 <div style={{ paddingLeft: '15px', borderLeft: '2px solid rgba(255,255,255,0.08)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
                                                     {c.comments.data.map(reply => (
                                                         <div key={reply.id} style={{ display: 'flex', gap: '8px' }}>
-                                                            <div style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#ccc', overflow: 'hidden', flexShrink: 0 }}>
+                                                            <div
+                                                                style={{ width: '28px', height: '28px', borderRadius: '50%', background: '#ccc', overflow: 'hidden', flexShrink: 0, cursor: 'pointer' }}
+                                                                onClick={() => handlePrivateReply(reply)}
+                                                                title="Nhấn để nhắn tin"
+                                                            >
                                                                 <img src={`https://graph.facebook.com/${reply.from?.id}/picture?type=square`} alt="avatar" style={{ width: '100%', height: '100%' }} onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(reply.from?.name || 'U')}&background=random`; }} />
                                                             </div>
                                                             <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', padding: '8px 12px', borderRadius: '8px' }}>
                                                                 <div style={{ fontWeight: 'bold', fontSize: '12px', color: 'var(--text-muted)' }}>{reply.from?.name || 'User'}</div>
                                                                 <div style={{ fontSize: '13px' }}>{reply.message}</div>
-                                                                <div style={{ fontSize: '10px', color: '#888', marginTop: '4px' }}>{new Date(reply.created_time).toLocaleString('vi-VN')}</div>
+                                                                <div style={{ fontSize: '10px', color: '#888', marginTop: '4px', display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                                                    {new Date(reply.created_time).toLocaleString('vi-VN')}
+                                                                    <span
+                                                                        onClick={() => handlePrivateReply(reply)}
+                                                                        style={{ color: 'var(--primary)', cursor: 'pointer', fontWeight: 'bold' }}
+                                                                    >
+                                                                        • Nhắn tin
+                                                                    </span>
+                                                                </div>
                                                             </div>
                                                         </div>
                                                     ))}

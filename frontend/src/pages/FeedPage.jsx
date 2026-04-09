@@ -3,14 +3,24 @@ import FeedList from '../components/Feed/FeedList';
 import AiReplyModal from '../components/AI/AiReplyModal';
 import * as api from '../api/fbApi';
 
+import { useNavigate } from 'react-router-dom';
+
 const FeedPage = ({ comments, onAction, onRefresh, loading }) => {
     const [selectedComment, setSelectedComment] = useState(null);
+    const navigate = useNavigate();
 
-    const handleAction = (action, payload) => {
+    const handleAction = async (action, payload) => {
         if (action === 'ai-reply') {
             setSelectedComment(payload);
+        } else if (action === 'private_reply') {
+            const comment = payload;
+            // Nhảy thẳng sang Messenger, không cần hiện Prompt
+            navigate('/messenger', { state: { targetUser: comment.from, sourceCommentId: comment.id } });
         } else {
-            onAction(action, payload);
+            // For standard actions like 'like', 'delete', 'hide', etc., payload should be the ID
+            // If the payload is an object here (due to my Fix), we pass its ID
+            const id = typeof payload === 'object' ? payload.id : payload;
+            onAction(action, id);
         }
     };
 

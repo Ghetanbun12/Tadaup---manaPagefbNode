@@ -95,6 +95,14 @@ class FacebookService:
         data = {"message": message}
         return self._call_api("POST", f"{comment_id}/comments", data=data, token=token)
 
+    def send_private_reply_to_comment(self, comment_id, token, message_text):
+        """Send a private message to a user who commented."""
+        data = {
+            "recipient": {"comment_id": comment_id},
+            "message": {"text": message_text}
+        }
+        return self._call_api("POST", "me/messages", data=data, token=token)
+
     def like_comment(self, comment_id, token):
         """Like a comment."""
         return self._call_api("POST", f"{comment_id}/likes", token=token)

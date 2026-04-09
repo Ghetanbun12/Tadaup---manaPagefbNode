@@ -71,6 +71,11 @@ export const replyToComment = async (commentId, message) => {
     return response.data;
 };
 
+export const sendPrivateReply = async (commentId, message) => {
+    const response = await apiClient.post('/page/comment/private-reply', { commentId, message });
+    return response.data;
+};
+
 export const attackComment = async (commentId) => {
     const response = await apiClient.post('/page/comment/like', { commentId });
     return response.data;
