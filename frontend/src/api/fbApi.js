@@ -38,9 +38,21 @@ export const selectPage = async (pageId) => {
     return response.data;
 };
 
-export const postToPage = async (message) => {
-    const response = await apiClient.post('/page/post', { message });
-    return response.data;
+export const postToPage = async (message, file = null) => {
+    if (file) {
+        const formData = new FormData();
+        formData.append('message', message);
+        formData.append('file', file);
+        const response = await apiClient.post('/page/post', formData, {
+            headers: {
+                'Content-Type': 'multipart/form-data'
+            }
+        });
+        return response.data;
+    } else {
+        const response = await apiClient.post('/page/post', { message });
+        return response.data;
+    }
 };
 
 export const getComments = async (postId = null) => {
@@ -91,5 +103,38 @@ export const getConversations = async () => {
 
 export const getConversationMessages = async (conversationId) => {
     const response = await apiClient.get(`/page/conversation/messages?conversationId=${conversationId}`);
+    return response.data;
+};
+
+// ─── Gemini AI APIs ───────────────────────────────────────────────────────────
+
+export const analyzeComments = async (comments) => {
+    const response = await apiClient.post('/ai/analyze-comments', { comments });
+    return response.data;
+};
+
+export const suggestReply = async (commentText, postContext = '', tone = 'friendly') => {
+    const response = await apiClient.post('/ai/suggest-reply', { commentText, postContext, tone });
+    return response.data;
+};
+
+export const autoAnalyzePage = async () => {
+    const response = await apiClient.post('/ai/auto-analyze-page');
+    return response.data;
+};
+
+// --- CUSTOMER TAGS ---
+export const getCustomerTags = async (customerId) => {
+    const response = await apiClient.get(`/tags/${customerId}`);
+    return response.data;
+};
+
+export const addCustomerTag = async (customerId, name, color) => {
+    const response = await apiClient.post(`/tags/${customerId}`, { name, color });
+    return response.data;
+};
+
+export const deleteCustomerTag = async (tagId) => {
+    const response = await apiClient.delete(`/tags/${tagId}`);
     return response.data;
 };

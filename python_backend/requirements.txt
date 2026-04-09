@@ -1,4 +1,7 @@
 flask
 flask-cors
+flask-sqlalchemy
+flask-jwt-extended
 requests
 python-dotenv
+google-generativeai>=0.5.0

@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app import fb_service
-from ..models import db, User, Page
+from app.models import db, User, Page
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 import logging
 

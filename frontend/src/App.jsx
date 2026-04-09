@@ -12,6 +12,7 @@ import Dashboard from './pages/Dashboard';
 import PostPage from './pages/PostPage';
 import FeedPage from './pages/FeedPage';
 import MessengerPage from './pages/MessengerPage';
+import AiCommentPage from './pages/AiCommentPage';
 
 // Auth Component
 import LoginSection from './components/Auth/LoginSection';
@@ -21,7 +22,7 @@ function App() {
     const [pageName, setPageName] = useState('');
     const [pages, setPages] = useState([]);
     const [activePageId, setActivePageId] = useState('');
-    
+
     const [comments, setComments] = useState([]);
     const [loadingFeed, setLoadingFeed] = useState(false);
     const [insights, setInsights] = useState(null);
@@ -118,9 +119,9 @@ function App() {
     /**
      * Action Handlers
      */
-    const handlePost = async (message) => {
+    const handlePost = async (message, file = null) => {
         try {
-            const res = await api.postToPage(message);
+            const res = await api.postToPage(message, file);
             setStatus(`Đã đăng bài! ID: ${res.id || res.postId}`);
         } catch (err) {
             setStatus('Đăng bài thất bại');
@@ -193,15 +194,15 @@ function App() {
             <div className="app-layout">
                 <Sidebar />
                 <main className="main-wrapper">
-                    <Header 
-                        pageName={pageName} 
-                        pages={pages} 
-                        activePageId={activePageId} 
-                        onPageSwitch={handlePageSwitch} 
+                    <Header
+                        pageName={pageName}
+                        pages={pages}
+                        activePageId={activePageId}
+                        onPageSwitch={handlePageSwitch}
                         isLoggedIn={isLoggedIn}
                         onLogout={handleLogout}
                     />
-                    
+
                     <StatusAlert status={status} />
 
                     <Routes>
@@ -216,6 +217,9 @@ function App() {
                         } />
                         <Route path="/messenger" element={
                             <MessengerPage onSendMessage={handleSendMessage} activePageId={activePageId} />
+                        } />
+                        <Route path="/ai-comments" element={
+                            <AiCommentPage />
                         } />
                         <Route path="*" element={<Navigate to="/" />} />
                     </Routes>

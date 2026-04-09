@@ -7,6 +7,7 @@ const Sidebar = () => {
         { path: '/posts', label: 'Create Post', icon: '📝' },
         { path: '/feed', label: 'Manage Feed', icon: '📰' },
         { path: '/messenger', label: 'Messenger', icon: '💬' },
+        { path: '/ai-comments', label: 'AI Comments', icon: '🤖' },
     ];
 
     return (
@@ -15,8 +16,8 @@ const Sidebar = () => {
                 <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
                     {navItems.map((item) => (
                         <li key={item.path} style={{ marginBottom: '8px' }}>
-                            <NavLink 
-                                to={item.path} 
+                            <NavLink
+                                to={item.path}
                                 className={({ isActive }) => `sidebar-link ${isActive ? 'active' : ''}`}
                             >
                                 <span style={{ marginRight: '10px' }}>{item.icon}</span>

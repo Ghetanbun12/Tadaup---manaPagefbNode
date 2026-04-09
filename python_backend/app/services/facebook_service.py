@@ -55,14 +55,39 @@ class FacebookService:
         data = {"message": message}
         return self._call_api("POST", f"{page_id}/feed", data=data, token=token)
 
+    def post_photo_to_feed(self, page_id, token, message, photo_file):
+        """Post a photo with message to page."""
+        url = f"{self.base_url}/{page_id}/photos"
+        params = {
+            "message": message,
+            "access_token": token
+        }
+        # In Flask, photo_file is a FileStorage object
+        files = {
+            "source": (photo_file.filename, photo_file.stream, photo_file.mimetype)
+        }
+        try:
+            logger.info(f"Calling Graph API: POST {page_id}/photos")
+            response = requests.post(url, params=params, files=files)
+            res_data = response.json()
+            
+            if not response.ok:
+                logger.error(f"Graph API Photo Error: {res_data}")
+                return {"success": False, "error": res_data.get("error", {}).get("message", "Unknown error"), "details": res_data}
+            
+            return {"success": True, "data": res_data}
+        except Exception as e:
+            logger.exception("Network error calling Graph API for photo")
+            return {"success": False, "error": str(e)}
+
     def get_posts_with_comments(self, page_id, token):
         """Get recent posts and their comments."""
-        params = {"fields": "message,comments{from,message,created_time}"}
+        params = {"fields": "message,comments{from,message,created_time,comments{from,message,created_time}}"}
         return self._call_api("GET", f"{page_id}/posts", params=params, token=token)
 
     def get_comment_list(self, post_id, token):
         """Get comments for a specific post."""
-        params = {"fields": "from,message,created_time"}
+        params = {"fields": "from,message,created_time,comments{from,message,created_time}"}
         return self._call_api("GET", f"{post_id}/comments", params=params, token=token)
 
     def reply_to_comment(self, comment_id, token, message):

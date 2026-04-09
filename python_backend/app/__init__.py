@@ -14,6 +14,10 @@ fb_service = FacebookService(
     app_secret=os.getenv('FB_APP_SECRET')
 )
 
+# Initialize gemini_service at module level
+from app.services.gemini_service import GeminiService
+gemini_service = GeminiService(api_key=os.getenv('GEMINI_API_KEY'))
+
 def create_app():
     app = Flask(__name__)
     CORS(app)
@@ -39,12 +43,16 @@ def create_app():
     setup_logger(app)
 
     # Register Blueprints
-    from app.routes.auth_routes import auth_bp
-    from app.routes.page_routes import page_bp
-    from app.routes.webhook_routes import webhook_bp
+    from app.middleware.routes.auth_routes import auth_bp
+    from app.middleware.routes.page_routes import page_bp
+    from app.middleware.routes.webhook_routes import webhook_bp
+    from app.middleware.routes.ai_routes import ai_bp
+    from app.middleware.routes.tag_routes import tag_bp
 
     app.register_blueprint(auth_bp, url_prefix='/api')
     app.register_blueprint(page_bp, url_prefix='/api')
+    app.register_blueprint(tag_bp, url_prefix='/api')
     app.register_blueprint(webhook_bp, url_prefix='/webhook')
+    app.register_blueprint(ai_bp, url_prefix='/api')
 
     return app

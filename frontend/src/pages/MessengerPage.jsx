@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import * as api from '../api/fbApi';
 import Skeleton, { SkeletonMessage } from '../components/Common/Skeleton';
+import AiReplyModal from '../components/AI/AiReplyModal';
 
 const MessengerPage = ({ onSendMessage, activePageId }) => {
     const [conversations, setConversations] = useState([]);
@@ -9,6 +10,9 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
     const [replyText, setReplyText] = useState('');
     const [loadingList, setLoadingList] = useState(false);
     const [loadingChat, setLoadingChat] = useState(false);
+    const [selectedMessageForAi, setSelectedMessageForAi] = useState(null);
+    const [customerTags, setCustomerTags] = useState([]);
+    const [newTag, setNewTag] = useState('');
 
     // 1. INITIAL LOAD: Load conversation list when page changes
     useEffect(() => {
@@ -33,8 +37,42 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
     useEffect(() => {
         if (selectedConv) {
             loadMessages(selectedConv.id);
+            loadTags(selectedConv.participants.data[0].id);
         }
     }, [selectedConv]);
+
+    const loadTags = async (customerId) => {
+        try {
+            const res = await api.getCustomerTags(customerId);
+            setCustomerTags(res.tags || []);
+        } catch (err) {
+            console.error("Failed to load tags", err);
+        }
+    };
+
+    const handleAddTag = async (e) => {
+        if (e.key === 'Enter' && newTag.trim() && selectedConv) {
+            const customerId = selectedConv.participants.data[0].id;
+            try {
+                const res = await api.addCustomerTag(customerId, newTag.trim());
+                setCustomerTags([res.tag, ...customerTags]);
+                setNewTag('');
+            } catch (err) {
+                alert('Tên nhãn dài quá hoặc bị lỗi!');
+            }
+        }
+    };
+
+    const handleDeleteTag = async (tagId) => {
+        if (window.confirm("Xóa nhãn này khỏi khách hàng?")) {
+            try {
+                await api.deleteCustomerTag(tagId);
+                setCustomerTags(customerTags.filter(t => t.id !== tagId));
+            } catch (err) {
+                console.error(err);
+            }
+        }
+    };
 
     const loadConversations = async (showLoading = false) => {
         if (showLoading) setLoadingList(true);
@@ -66,17 +104,17 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
 
     const handleSendReply = async () => {
         if (!replyText.trim() || !selectedConv) return;
-        
+
         const recipientId = selectedConv.participants.data[0].id;
         try {
             await onSendMessage(recipientId, replyText);
             setReplyText('');
-            
+
             // 1. Clear unread count in local state
-            setConversations(prev => prev.map(c => 
+            setConversations(prev => prev.map(c =>
                 c.id === selectedConv.id ? { ...c, unread_count: 0 } : c
             ));
-            
+
             // 2. Reload messages to show the new one
             loadMessages(selectedConv.id);
         } catch (err) {
@@ -87,7 +125,7 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
     return (
         <div className="page-content" style={{ height: '100%' }}>
             <h2 style={{ marginBottom: '20px' }}>Hộp thư Inbox</h2>
-            
+
             <div className="inbox-layout">
                 {/* Left: Conversation List */}
                 <div className="conv-list">
@@ -114,22 +152,27 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
                             const user = conv.participants.data[0];
                             const isActive = selectedConv?.id === conv.id;
                             const isUnread = conv.unread_count > 0;
-                            
+
                             return (
-                                <div 
-                                    key={conv.id} 
+                                <div
+                                    key={conv.id}
                                     className={`conv-item ${isActive ? 'active' : ''}`}
                                     onClick={() => setSelectedConv(conv)}
                                 >
-                                    <div className="conv-name">
-                                        <span>{user.name}</span>
-                                        {isUnread && <span className="unread-badge">{conv.unread_count}</span>}
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#ccc', overflow: 'hidden', marginRight: '12px', flexShrink: 0 }}>
+                                        <img src={`https://graph.facebook.com/${user.id}/picture?type=square`} alt="avatar" style={{ width: '100%', height: '100%' }} onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(user.name || 'U')}&background=random`; }} />
                                     </div>
-                                    <div className="conv-snippet" style={{ fontWeight: isUnread ? '700' : '400', color: isUnread ? 'var(--text-main)' : 'var(--text-muted)' }}>
-                                        {conv.snippet}
-                                    </div>
-                                    <div style={{ fontSize: '10px', color: '#aaa', marginTop: '2px' }}>
-                                        {new Date(conv.updated_time).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                    <div style={{ flex: 1, minWidth: 0 }}>
+                                        <div className="conv-name">
+                                            <span style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.name}</span>
+                                            {isUnread && <span className="unread-badge">{conv.unread_count}</span>}
+                                        </div>
+                                        <div className="conv-snippet" style={{ fontWeight: isUnread ? '700' : '400', color: isUnread ? 'var(--text-main)' : 'var(--text-muted)' }}>
+                                            {conv.snippet}
+                                        </div>
+                                        <div style={{ fontSize: '10px', color: '#aaa', marginTop: '2px' }}>
+                                            {new Date(conv.updated_time).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                        </div>
                                     </div>
                                 </div>
                             );
@@ -141,9 +184,24 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
                 <div className="chat-panel">
                     {selectedConv ? (
                         <>
-                            <div style={{ padding: '15px', borderBottom: '1px solid var(--border-light)', background: '#fff', zIndex: 1 }}>
-                                <strong style={{ fontSize: '16px' }}>{selectedConv.participants.data[0].name}</strong>
-                                <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>ID: {selectedConv.participants.data[0].id}</div>
+                            <div style={{ padding: '15px', borderBottom: '1px solid var(--border-light)', background: '#fff', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: '15px' }}>
+                                    <div style={{ width: '40px', height: '40px', borderRadius: '50%', background: '#ccc', overflow: 'hidden' }}>
+                                        <img src={`https://graph.facebook.com/${selectedConv.participants.data[0].id}/picture?type=square`} alt="avatar" style={{ width: '100%', height: '100%' }} onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(selectedConv.participants.data[0].name || 'U')}&background=random`; }} />
+                                    </div>
+                                    <div>
+                                        <strong style={{ fontSize: '16px' }}>{selectedConv.participants.data[0].name}</strong>
+                                        <div style={{ fontSize: '12px', color: 'var(--text-muted)' }}>ID: {selectedConv.participants.data[0].id}</div>
+                                    </div>
+                                </div>
+                                <div className="customer-tags" style={{ display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap', maxWidth: '300px', justifyContent: 'flex-end' }}>
+                                    {customerTags.map(tag => (
+                                        <span key={tag.id} title="Bấm để xóa" onClick={() => handleDeleteTag(tag.id)} style={{ background: tag.color, color: '#fff', padding: '2px 8px', borderRadius: '12px', fontSize: '11px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '4px' }}>
+                                            {tag.name} <span>×</span>
+                                        </span>
+                                    ))}
+                                    <input type="text" placeholder="+ Nhãn mới" value={newTag} onChange={e => setNewTag(e.target.value)} onKeyDown={handleAddTag} title="Gõ tên nhãn và nhấn Enter" style={{ fontSize: '11px', padding: '2px 6px', width: '80px', borderRadius: '12px', border: '1px dashed #ccc', outline: 'none' }} />
+                                </div>
                             </div>
 
                             <div className="chat-history">
@@ -155,22 +213,41 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
                                     </div>
                                 ) : (
                                     messages.map(msg => {
-                                        const isMe = !msg.from?.id || msg.from.id === activePageId || msg.from.name === selectedConv.participants.data[1]?.name; 
+                                        const isMe = !msg.from?.id || msg.from.id === activePageId || msg.from.name === selectedConv.participants.data[1]?.name;
                                         // Note: Logic identify "me" might need adjustment based on FB SDK data
                                         return (
-                                            <div key={msg.id} className={`msg-bubble ${isMe ? 'me' : 'them'}`}>
-                                                <div style={{ wordBreak: 'break-word' }}>
-                                                    {msg.message || (
-                                                        <span style={{ fontStyle: 'italic', opacity: 0.8, fontSize: '13px' }}>
-                                                            (Stickers/Hình ảnh/Icon)
-                                                        </span>
-                                                    )}
-                                                </div>
-                                                {msg.created_time && (
-                                                    <div className="msg-time">
-                                                        {new Date(msg.created_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                            <div key={msg.id} style={{ display: 'flex', flexDirection: isMe ? 'row-reverse' : 'row', gap: '8px', marginBottom: '15px' }}>
+                                                {!isMe && (
+                                                    <div style={{ width: '32px', height: '32px', borderRadius: '50%', overflow: 'hidden', flexShrink: 0, marginTop: 'auto' }}>
+                                                        <img src={`https://graph.facebook.com/${msg.from?.id || selectedConv.participants.data[0].id}/picture?type=square`} alt="avatar" style={{ width: '100%', height: '100%' }} onError={(e) => { e.target.onerror = null; e.target.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(msg.from?.name || selectedConv.participants.data[0].name || 'U')}&background=random`; }} />
                                                     </div>
                                                 )}
+                                                <div style={{ display: 'flex', flexDirection: 'column', alignItems: isMe ? 'flex-end' : 'flex-start' }}>
+                                                    <div className={`msg-bubble ${isMe ? 'me' : 'them'}`}>
+                                                        <div style={{ wordBreak: 'break-word' }}>
+                                                            {msg.message || (
+                                                                <span style={{ fontStyle: 'italic', opacity: 0.8, fontSize: '13px' }}>
+                                                                    (Stickers/Hình ảnh/Icon)
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    </div>
+                                                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '4px' }}>
+                                                        {msg.created_time && (
+                                                            <div className="msg-time" style={{ margin: 0 }}>
+                                                                {new Date(msg.created_time).toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                                                            </div>
+                                                        )}
+                                                        {!isMe && (
+                                                            <button
+                                                                onClick={() => setSelectedMessageForAi({ id: msg.id, message: msg.message, from: msg.from })}
+                                                                style={{ background: 'none', border: '1px solid #7c6aff', color: '#7c6aff', padding: '2px 6px', borderRadius: '4px', fontSize: '10px', cursor: 'pointer' }}
+                                                            >
+                                                                🤖 AI Phản hồi
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                </div>
                                             </div>
                                         );
                                     })
@@ -179,10 +256,10 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
 
                             <div className="chat-footer">
                                 <div style={{ display: 'flex', gap: '10px' }}>
-                                    <input 
-                                        type="text" 
-                                        className="input-field" 
-                                        placeholder="Nhập tin nhắn phản hồi..." 
+                                    <input
+                                        type="text"
+                                        className="input-field"
+                                        placeholder="Nhập tin nhắn phản hồi..."
                                         value={replyText}
                                         onChange={(e) => setReplyText(e.target.value)}
                                         onKeyPress={(e) => e.key === 'Enter' && handleSendReply()}
@@ -199,6 +276,14 @@ const MessengerPage = ({ onSendMessage, activePageId }) => {
                     )}
                 </div>
             </div>
+
+            {selectedMessageForAi && (
+                <AiReplyModal
+                    comment={selectedMessageForAi}
+                    onClose={() => setSelectedMessageForAi(null)}
+                    onUseReply={(_, text) => setReplyText(text)}
+                />
+            )}
         </div>
     );
 };

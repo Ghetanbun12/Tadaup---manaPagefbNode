@@ -1,6 +1,6 @@
 from flask import Blueprint, request, jsonify
 from app import fb_service
-from ..models import Page
+from app.models import Page
 from flask_jwt_extended import jwt_required, get_jwt_identity
 
 page_bp = Blueprint('page', __name__)
@@ -17,8 +17,19 @@ def post_to_page():
     if not active_page:
         return jsonify({"error": "No active page selected"}), 401
 
-    message = request.json.get('message')
-    res = fb_service.post_to_feed(active_page.id, active_page.access_token, message)
+    # Support both JSON and form-data
+    if request.is_json:
+        message = request.json.get('message')
+        photo_file = None
+    else:
+        message = request.form.get('message')
+        photo_file = request.files.get('file')
+
+    if photo_file:
+        res = fb_service.post_photo_to_feed(active_page.id, active_page.access_token, message, photo_file)
+    else:
+        res = fb_service.post_to_feed(active_page.id, active_page.access_token, message)
+        
     return jsonify(res["data"] if res["success"] else res), (200 if res["success"] else 500)
 
 @page_bp.get('/page/comments')
